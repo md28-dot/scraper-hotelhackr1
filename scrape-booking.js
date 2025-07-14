@@ -46,8 +46,15 @@ module.exports = async function scrapeBooking(city, checkIn, checkOut, adults, m
 
   await browser.close();
 
-  // Option : supprimer les doublons par lien
+  // Supprimer doublons par lien
   const uniqueResults = Array.from(new Map(allResults.map(obj => [obj.link, obj])).values());
 
-  return uniqueResults;
+  // Trier par prix croissant
+  const sorted = uniqueResults.sort((a, b) => {
+    const priceA = parseFloat(a.price.replace(/[^0-9.]/g, ""));
+    const priceB = parseFloat(b.price.replace(/[^0-9.]/g, ""));
+    return priceA - priceB;
+  });
+
+  return sorted;
 };
