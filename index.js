@@ -10,7 +10,7 @@ app.get("/", (req, res) => {
   res.send("HotelHackr scraper backend is running!");
 });
 
-// 🏨 Route de base : scraping Booking normal avec pagination dynamique
+// Scraping Booking simple (30 à 60 hôtels)
 app.get("/scrape-booking", async (req, res) => {
   const city = req.query.city || "Paris";
   const checkIn = req.query.checkIn || "2025-07-15";
@@ -25,7 +25,7 @@ app.get("/scrape-booking", async (req, res) => {
   }
 });
 
-// 📱🖥️ Comparaison mobile vs desktop
+// Comparaison mobile vs desktop
 app.get("/compare-device-prices", async (req, res) => {
   const city = req.query.city || "Paris";
   const checkIn = req.query.checkIn || "2025-07-15";
@@ -40,7 +40,7 @@ app.get("/compare-device-prices", async (req, res) => {
   }
 });
 
-// 📊 Différence de prix entre mobile et desktop avec tri
+// Comparaison améliorée des prix (flexible, noms normalisés)
 app.get("/price-diff", async (req, res) => {
   const city = req.query.city || "Paris";
   const checkIn = req.query.checkIn || "2025-07-15";
