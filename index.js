@@ -1,4 +1,4 @@
-// index.js complet et corrigé avec protection timeout, User-Agent réaliste, et pagination dynamique Booking
+// index.js complet avec amélioration du scraping Booking (timeout, fallback, debug HTML)
 const express = require("express");
 const cors = require("cors");
 const playwright = require("playwright");
@@ -8,16 +8,12 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Fonction principale pour scraper Booking (desktop ou mobile)
+// Fonction d’extraction complète avec pagination + images + adresse
 async function scrapeBookingHotels(url, userAgent = null) {
   const browser = await playwright.chromium.launch({ headless: true });
-
-  const context = await browser.newContext({
-    userAgent: userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 800 },
-    locale: 'en-US'
-  });
-
+  const context = userAgent
+    ? await browser.newContext({ userAgent })
+    : await browser.newContext();
   const page = await context.newPage();
   let results = [];
   let nextPage = url;
@@ -25,9 +21,16 @@ async function scrapeBookingHotels(url, userAgent = null) {
 
   while (nextPage && pageCount < 3) {
     await page.goto(nextPage, { timeout: 45000 });
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle"); // attend que le réseau se calme
+    await page.waitForTimeout(5000); // pause manuelle de 5 secondes
 
-    await page.waitForSelector('[data-testid="property-card"]', { timeout: 30000 });
+    const hasCards = await page.$('[data-testid="property-card"]');
+    if (!hasCards) {
+      const html = await page.content();
+      console.error("❌ Aucun 'property-card' détecté. Extrait HTML :");
+      console.error(html.slice(0, 2000));
+      throw new Error("property-card non détecté après timeout");
+    }
 
     const hotels = await page.$$eval('[data-testid="property-card"]', cards => {
       return cards.map(card => {
@@ -57,7 +60,7 @@ async function scrapeBookingHotels(url, userAgent = null) {
   return results;
 }
 
-// Route POST /search-with-details
+// Route principale avec comparaison desktop/mobile + détails
 app.post("/search-with-details", async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: "Missing URL" });
