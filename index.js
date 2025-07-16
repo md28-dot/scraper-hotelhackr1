@@ -1,3 +1,4 @@
+// index.js complet et corrigé avec protection timeout, User-Agent réaliste, et pagination dynamique Booking
 const express = require("express");
 const cors = require("cors");
 const playwright = require("playwright");
@@ -7,12 +8,16 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Fonction scraping complète
+// Fonction principale pour scraper Booking (desktop ou mobile)
 async function scrapeBookingHotels(url, userAgent = null) {
   const browser = await playwright.chromium.launch({ headless: true });
-  const context = userAgent
-    ? await browser.newContext({ userAgent })
-    : await browser.newContext();
+
+  const context = await browser.newContext({
+    userAgent: userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 800 },
+    locale: 'en-US'
+  });
+
   const page = await context.newPage();
   let results = [];
   let nextPage = url;
@@ -20,7 +25,9 @@ async function scrapeBookingHotels(url, userAgent = null) {
 
   while (nextPage && pageCount < 3) {
     await page.goto(nextPage, { timeout: 45000 });
-    await page.waitForSelector('[data-testid="property-card"]', { timeout: 15000 });
+    await page.waitForLoadState("networkidle");
+
+    await page.waitForSelector('[data-testid="property-card"]', { timeout: 30000 });
 
     const hotels = await page.$$eval('[data-testid="property-card"]', cards => {
       return cards.map(card => {
@@ -36,7 +43,13 @@ async function scrapeBookingHotels(url, userAgent = null) {
     results = results.concat(hotels);
 
     const nextLink = await page.$("a[aria-label='Next page']");
-    nextPage = nextLink ? "https://www.booking.com" + await nextLink.getAttribute("href") : null;
+    if (nextLink) {
+      const href = await nextLink.getAttribute("href");
+      nextPage = href ? "https://www.booking.com" + href : null;
+    } else {
+      nextPage = null;
+    }
+
     pageCount++;
   }
 
@@ -44,6 +57,7 @@ async function scrapeBookingHotels(url, userAgent = null) {
   return results;
 }
 
+// Route POST /search-with-details
 app.post("/search-with-details", async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: "Missing URL" });
