@@ -1,4 +1,3 @@
-// index.js complet avec route unifiée : /search-with-details
 const express = require("express");
 const cors = require("cors");
 const playwright = require("playwright");
@@ -8,7 +7,7 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Fonction d’extraction complète avec pagination + images + adresse
+// Fonction scraping complète
 async function scrapeBookingHotels(url, userAgent = null) {
   const browser = await playwright.chromium.launch({ headless: true });
   const context = userAgent
@@ -19,7 +18,7 @@ async function scrapeBookingHotels(url, userAgent = null) {
   let nextPage = url;
   let pageCount = 0;
 
-  while (nextPage && pageCount < 3) { // Limite à 3 pages pour test
+  while (nextPage && pageCount < 3) {
     await page.goto(nextPage, { timeout: 45000 });
     await page.waitForSelector('[data-testid="property-card"]', { timeout: 15000 });
 
@@ -37,13 +36,7 @@ async function scrapeBookingHotels(url, userAgent = null) {
     results = results.concat(hotels);
 
     const nextLink = await page.$("a[aria-label='Next page']");
-    if (nextLink) {
-      const href = await nextLink.getAttribute("href");
-      nextPage = href ? "https://www.booking.com" + href : null;
-    } else {
-      nextPage = null;
-    }
-
+    nextPage = nextLink ? "https://www.booking.com" + await nextLink.getAttribute("href") : null;
     pageCount++;
   }
 
@@ -51,7 +44,6 @@ async function scrapeBookingHotels(url, userAgent = null) {
   return results;
 }
 
-// Route principale avec comparaison desktop/mobile + détails
 app.post("/search-with-details", async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: "Missing URL" });
@@ -90,5 +82,5 @@ app.post("/search-with-details", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
