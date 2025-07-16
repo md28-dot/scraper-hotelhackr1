@@ -4,7 +4,8 @@
   "description": "Scraper Booking.com avec comparaison mobile vs desktop",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "cors": "^2.8.5",
