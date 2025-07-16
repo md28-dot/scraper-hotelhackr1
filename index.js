@@ -1,7 +1,7 @@
-// index.js complet avec amélioration du scraping Booking (timeout, fallback, debug HTML)
 const express = require("express");
 const cors = require("cors");
 const playwright = require("playwright");
+
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -21,16 +21,9 @@ async function scrapeBookingHotels(url, userAgent = null) {
 
   while (nextPage && pageCount < 3) {
     await page.goto(nextPage, { timeout: 45000 });
-    await page.waitForLoadState("networkidle"); // attend que le réseau se calme
-    await page.waitForTimeout(5000); // pause manuelle de 5 secondes
 
-    const hasCards = await page.$('[data-testid="property-card"]');
-    if (!hasCards) {
-      const html = await page.content();
-      console.error("❌ Aucun 'property-card' détecté. Extrait HTML :");
-      console.error(html.slice(0, 2000));
-      throw new Error("property-card non détecté après timeout");
-    }
+    // Remplace le waitForSelector par un délai fixe
+    await page.waitForTimeout(10000);
 
     const hotels = await page.$$eval('[data-testid="property-card"]', cards => {
       return cards.map(card => {
@@ -60,7 +53,7 @@ async function scrapeBookingHotels(url, userAgent = null) {
   return results;
 }
 
-// Route principale avec comparaison desktop/mobile + détails
+// Route unifiée
 app.post("/search-with-details", async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: "Missing URL" });
@@ -94,6 +87,7 @@ app.post("/search-with-details", async (req, res) => {
 
     res.json({ success: true, data: merged });
   } catch (err) {
+    console.error("Scraping error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
