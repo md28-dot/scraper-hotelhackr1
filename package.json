@@ -7,7 +7,20 @@
     "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "playwright": "^1.43.0"
-  }
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "playwright": "^1.54.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/md28-dot/scraper-hotelhackr1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/md28-dot/scraper-hotelhackr1/issues"
+  },
+  "homepage": "https://github.com/md28-dot/scraper-hotelhackr1#readme",
+  "description": ""
 }
