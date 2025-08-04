@@ -1,60 +1,47 @@
-const playwright = require("playwright");
+const playwright = require('playwright');
 
-module.exports = async function scrapeBooking(city, checkIn, checkOut, adults, maxPages = 3) {
-  const browser = await playwright.chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/119.0 Safari/537.36",
-    viewport: { width: 1280, height: 800 },
+async function scrapeBooking(url) {
+  const browser = await playwright.chromium.launch({
+    headless: true,
+    args: ['--no-sandbox']
   });
-  const page = await context.newPage();
+  const page = await browser.newPage();
 
-  const searchUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&checkin=${checkIn}&checkout=${checkOut}&group_adults=${adults}`;
+  try {
+    console.log(`🔍 Navigation vers : ${url}`);
+    await page.goto(url, { timeout: 60000, waitUntil: 'domcontentloaded' });
 
-  await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(6000);
-
-  const allResults = [];
-  let currentPage = 1;
-
-  while (currentPage <= maxPages) {
-    console.log(`Scraping page ${currentPage}...`);
-    const hotels = await page.evaluate(() => {
-      const results = [];
-      document.querySelectorAll("div[data-testid]").forEach(el => {
-        const title = el.querySelector("[data-testid='title']")?.innerText?.trim();
-        const price =
-          el.querySelector("[data-testid='price']")?.innerText?.trim() ||
-          el.querySelector("[data-testid='price-and-discounted-price']")?.innerText?.trim();
-        const link = el.querySelector("a")?.href;
-
-        if (title && price && link && link.includes("/hotel/")) {
-          results.push({ name: title, price, link });
-        }
-      });
-      return results;
+    await page.waitForSelector('[data-testid="property-card"]', {
+      timeout: 45000
     });
 
-    allResults.push(...hotels);
+    const hotelCards = await page.$$('[data-testid="property-card"]');
+    console.log(`✅ ${hotelCards.length} cartes d’hôtels détectées`);
 
-    const nextButton = await page.$("button[aria-label='Next page'], a[aria-label='Next page']");
-    if (!nextButton) break;
+    const data = [];
 
-    await nextButton.click();
-    await page.waitForTimeout(5000);
-    currentPage++;
+    for (let card of hotelCards) {
+      const name = await card.$eval('[data-testid="title"]', el => el.innerText).catch(() => null);
+      const price = await card.$eval('[data-testid="price-and-discounted-price"]', el => el.innerText).catch(() => null);
+      const image = await card.$eval('img', el => el.src).catch(() => null);
+      const link = await card.$eval('a', el => el.href).catch(() => null);
+
+      if (name && price && link) {
+        data.push({ name, price, image, link });
+      }
+    }
+
+    if (data.length === 0) {
+      console.warn('⚠️ Aucun hôtel n’a pu être extrait malgré la détection de cartes.');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('❌ Erreur dans le scraping :', error);
+    return [];
+  } finally {
+    await browser.close();
   }
+}
 
-  await browser.close();
-
-  // Supprimer doublons par lien
-  const uniqueResults = Array.from(new Map(allResults.map(obj => [obj.link, obj])).values());
-
-  // Trier par prix croissant
-  const sorted = uniqueResults.sort((a, b) => {
-    const priceA = parseFloat(a.price.replace(/[^0-9.]/g, ""));
-    const priceB = parseFloat(b.price.replace(/[^0-9.]/g, ""));
-    return priceA - priceB;
-  });
-
-  return sorted;
-};
+module.exports = scrapeBooking;
