@@ -1,46 +1,33 @@
-const playwright = require('playwright');
+const { chromium } = require('playwright');
 
 async function scrapeBooking(url) {
-  const browser = await playwright.chromium.launch({
+  const browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox']
+    args: ['--no-sandbox'],
   });
   const page = await browser.newPage();
 
   try {
-    console.log(`🔍 Navigation vers : ${url}`);
-    await page.goto(url, { timeout: 60000, waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
-    await page.waitForSelector('[data-testid="property-card"]', {
-      timeout: 45000
+    // S'assurer que la page charge bien les résultats
+    await page.waitForSelector("[data-testid='property-card'], .b978843432", { timeout: 30000 });
+
+    const hotels = await page.$$eval("[data-testid='property-card']", cards => {
+      return cards.map(card => {
+        const name = card.querySelector('div[data-testid="title"]')?.innerText || 'N/A';
+        const price = card.querySelector('[data-testid="price-and-discounted-price"]')?.innerText || 'N/A';
+        const rating = card.querySelector('[data-testid="review-score"]')?.innerText || 'N/A';
+        return { name, price, rating };
+      });
     });
 
-    const hotelCards = await page.$$('[data-testid="property-card"]');
-    console.log(`✅ ${hotelCards.length} cartes d’hôtels détectées`);
-
-    const data = [];
-
-    for (let card of hotelCards) {
-      const name = await card.$eval('[data-testid="title"]', el => el.innerText).catch(() => null);
-      const price = await card.$eval('[data-testid="price-and-discounted-price"]', el => el.innerText).catch(() => null);
-      const image = await card.$eval('img', el => el.src).catch(() => null);
-      const link = await card.$eval('a', el => el.href).catch(() => null);
-
-      if (name && price && link) {
-        data.push({ name, price, image, link });
-      }
-    }
-
-    if (data.length === 0) {
-      console.warn('⚠️ Aucun hôtel n’a pu être extrait malgré la détection de cartes.');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('❌ Erreur dans le scraping :', error);
-    return [];
-  } finally {
     await browser.close();
+    return hotels;
+  } catch (error) {
+    console.error("❌ Erreur scraping Booking:", error);
+    await browser.close();
+    return [];
   }
 }
 
